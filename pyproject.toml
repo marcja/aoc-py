@@ -11,10 +11,14 @@ packages = [{include = "aoc", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.12"
 numpy = "^1.26.2"
+tqdm = "^4.66.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
 ruff = "^0.1.7"
+
+[tool.ruff.lint]
+extend-select = ["I"]
 
 [build-system]
 requires = ["poetry-core"]
