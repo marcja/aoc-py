@@ -253,3 +253,6 @@ pip-selfcheck.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,visualstudiocode,git,venv
+
+# Specific to Advent of Code. Don't commit user-specific puzzle inputs.
+src/aoc/**/data/*
