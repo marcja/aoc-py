@@ -12,28 +12,8 @@ def ex01_path():
 
 
 @pytest.fixture
-def ex01_text(ex01_path):
-    return ex01_path.read_text().rstrip()
-
-
-@pytest.fixture
 def ex01_data(ex01_path):
     return parse(ex01_path)
-
-
-@pytest.fixture
-def ex02_path():
-    return DATA / "ex02.txt"
-
-
-@pytest.fixture
-def ex02_text(ex02_path):
-    return ex01_path.read_text().rstrip()
-
-
-@pytest.fixture
-def ex02_data(ex02_path):
-    return parse(ex02_path)
 
 
 def test_parse_ex01(ex01_path):
