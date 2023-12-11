@@ -1,3 +1,4 @@
+from math import ceil
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -73,11 +74,15 @@ def parse(path):
 
 def solve_part1(data):
     _, cycle, _ = data
-    return len(cycle) // 2 + len(cycle) % 2
+    return ceil(len(cycle) / 2.0)
 
 
 def solve_part2(data):
     _, cycle, _ = data
+
+    # try also
+    # https://stackoverflow.com/questions/24467972/calculate-area-of-polygon-given-x-y-coordinates/30408825#30408825
+    # return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
     x, y = zip(*cycle)
     dets = [x[i] * y[i - 1] - x[i - 1] * y[i] for i in range(len(cycle))]
