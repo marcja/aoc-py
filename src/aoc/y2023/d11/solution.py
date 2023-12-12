@@ -32,10 +32,10 @@ def solve(data, mult=1):
     cold = np.arange(len(cols)) + cols
 
     bity, bitx = np.where(data == "#")
-    outx = np.abs(rowd[bity] - rowd[bity][:, np.newaxis])
-    outy = np.abs(cold[bitx] - cold[bitx][:, np.newaxis])
+    outy = np.abs(rowd[bity] - rowd[bity][:, np.newaxis])
+    outx = np.abs(cold[bitx] - cold[bitx][:, np.newaxis])
 
-    return np.triu(outx + outy).sum()
+    return np.triu(outy + outx).sum()
 
 
 def solve_part1(data):
