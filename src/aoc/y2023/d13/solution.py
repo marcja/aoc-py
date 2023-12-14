@@ -20,23 +20,24 @@ def parse(path):
     return pats
 
 
-def find_reflection_h(pattern, exclude=0):
+def find_reflection_h(pattern, goal, exclude=0):
     for i in range(1, pattern.shape[1]):
         if i == exclude:
             continue
 
         lhs, rhs = np.hsplit(pattern, [i])
-        siz = min(lhs.shape[1], rhs.shape[1])
-        if (np.fliplr(lhs)[:, :siz] == rhs[:, :siz]).all():
+        end = min(lhs.shape[1], rhs.shape[1])
+
+        if np.count_nonzero(np.fliplr(lhs)[:, :end] ^ rhs[:, :end]) == goal:
             return i
 
 
-def find_reflection(pattern, exclude=0):
-    r = find_reflection_h(pattern, exclude)
+def find_reflection(pattern, goal, exclude=0):
+    r = find_reflection_h(pattern, goal, exclude)
     if r:
         return r
 
-    r = find_reflection_h(np.rot90(pattern), exclude / 100)
+    r = find_reflection_h(np.rot90(pattern), goal, exclude / 100)
     if r:
         return r * 100
 
@@ -44,22 +45,11 @@ def find_reflection(pattern, exclude=0):
 
 
 def solve_part1(data):
-    return sum([find_reflection(pattern) for pattern in data])
+    return sum([find_reflection(pattern, 0) for pattern in data])
 
 
 def solve_part2(data):
-    sum = 0
-    for pattern in data:
-        mask = np.zeros_like(pattern)
-        base = find_reflection(pattern)
-        mask[0, 0] = 1
-        for i in range(len(pattern.flat)):
-            r = find_reflection(pattern ^ np.roll(mask, i), base)
-            if r > 0:
-                sum += r
-                break
-
-    return sum
+    return sum([find_reflection(pattern, 1) for pattern in data])
 
 
 def main():
