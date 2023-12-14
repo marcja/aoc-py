@@ -49,7 +49,7 @@ def solve_part1(data):
 
 def solve_part2(data):
     sum = 0
-    for id, pattern in enumerate(data):
+    for pattern in data:
         mask = np.zeros_like(pattern)
         base = find_reflection(pattern)
         mask[0, 0] = 1
