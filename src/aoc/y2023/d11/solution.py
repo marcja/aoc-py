@@ -25,8 +25,8 @@ def solve(data, mult=1):
     mult = max(1, mult - 1)
 
     dots = data == "."
-    rows = np.cumsum(np.all(dots, axis=1).astype(int) * mult)
-    cols = np.cumsum(np.all(dots, axis=0).astype(int) * mult)
+    rows = np.cumsum(np.all(dots, axis=1).astype(np.int64) * mult)
+    cols = np.cumsum(np.all(dots, axis=0).astype(np.int64) * mult)
 
     rowd = np.arange(len(rows)) + rows
     cold = np.arange(len(cols)) + cols
