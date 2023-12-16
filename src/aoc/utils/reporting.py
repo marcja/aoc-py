@@ -5,7 +5,7 @@ from functools import wraps
 from time import perf_counter
 
 
-def timed(func):
+def report(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         t0 = perf_counter()

@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from aoc.utils.timing import timed
+from aoc.utils.reporting import report
 
 
 def parse(path):
@@ -32,14 +32,14 @@ def parse(path):
         return cubes
 
 
-@timed
+@report
 def solve_part1(cubes):
     limit = np.array([12, 13, 14])
     valid = np.all(cubes.max(2) <= limit, 1)
     return np.sum(np.argwhere(valid) + 1)
 
 
-@timed
+@report
 def solve_part2(cubes):
     return cubes.max(2).prod(1).sum()
 

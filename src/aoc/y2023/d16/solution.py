@@ -3,7 +3,7 @@ import sys
 from collections import deque
 from pathlib import Path
 
-from aoc.utils.timing import timed
+from aoc.utils.reporting import report
 
 N = (-1, 0)  # North
 E = (0, 1)  # East
@@ -105,12 +105,12 @@ def march(board: tuple[str, ...], curr: tuple[int, int], news: tuple[int, int]) 
     return len(tiles)
 
 
-@timed
+@report
 def solve_part1(board: tuple[str, ...]) -> int:
     return march(board, (0, -1), E)
 
 
-@timed
+@report
 def solve_part2(board: tuple[str, ...]) -> int:
     res = []
 

@@ -2,7 +2,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from aoc.utils.timing import timed
+from aoc.utils.reporting import report
 
 
 def parse(path):
@@ -20,12 +20,12 @@ def hash_item(item):
     return res
 
 
-@timed
+@report
 def solve_part1(data):
     return sum([hash_item(item) for item in data])
 
 
-@timed
+@report
 def solve_part2(data):
     boxes = defaultdict(dict)
 
