@@ -25,40 +25,20 @@ def solve_part1(data):
 
 
 def solve_part2(data):
-    boxes = defaultdict(list)
+    boxes = defaultdict(dict)
 
     for item in data:
         oper = item.rstrip("-").split("=")
         match oper:
             case [lens]:
-                bid = hash_item(lens)
-                box = boxes[bid]
-                lid = -1
-                for i in range(len(box)):
-                    if box[i][0] == lens:
-                        lid = i
-                        break
-                if lid >= 0:
-                    del box[lid]
-            case [lens, foca]:
-                bid = hash_item(lens)
-                box = boxes[bid]
-                lid = -1
-                for i in range(len(box)):
-                    if box[i][0] == lens:
-                        lid = i
-                        break
-                if lid >= 0:
-                    del box[lid]
-                    box.insert(lid, [lens, int(foca)])
-                else:
-                    box.append([lens, int(foca)])
+                boxes[hash_item(lens)].pop(lens, None)
+            case [lens, f]:
+                boxes[hash_item(lens)][lens] = int(f)
 
     res = 0
-    for bid in range(256):
-        box = boxes[bid]
-        for i, [lens, foca] in enumerate(box):
-            res += (bid + 1) * (i + 1) * foca
+    for box, lenses in boxes.items():
+        for i, f in enumerate(lenses.values(), 1):
+            res += (box + 1) * i * f
 
     return res
 
