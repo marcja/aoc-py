@@ -1,8 +1,8 @@
 import sys
 from collections import defaultdict
-from datetime import timedelta
 from pathlib import Path
-from time import perf_counter
+
+from aoc.utils.timing import timed
 
 
 def parse(path):
@@ -20,10 +20,12 @@ def hash_item(item):
     return res
 
 
+@timed
 def solve_part1(data):
     return sum([hash_item(item) for item in data])
 
 
+@timed
 def solve_part2(data):
     boxes = defaultdict(dict)
 
@@ -47,15 +49,11 @@ def main():
     path = Path(sys.argv[1])
     data = parse(path)
 
-    time0 = perf_counter()
     part1 = solve_part1(data)
-    time1 = perf_counter()
-    part2 = solve_part2(data)
-    time2 = perf_counter()
+    print(f"> solve_part1 | {part1:>20} |")
 
-    print()
-    print(f"part1 | {timedelta(seconds=time1 - time0)} | {part1:>20} |")
-    print(f"part2 | {timedelta(seconds=time2 - time1)} | {part2:>20} |")
+    part2 = solve_part2(data)
+    print(f"> solve_part2 | {part2:>20} |")
 
     return 0
 
