@@ -7,8 +7,17 @@ from aoc.utils.timing import timed
 
 
 def parse(path):
-    COLORS = {"red": 0, "green": 1, "blue": 2}
-    MAXPLY = 10
+    """Returns the history of games as a 3-D array (game, color, round).
+
+    Args:
+        path (_type_): a path to the input file
+
+    Returns:
+        _type_: an NDArray of integers
+    """
+
+    COLORS = {"red": 0, "green": 1, "blue": 2}  # map color to index
+    MAXPLY = 10  # HACK: a hard-coded limit of MAXPLY rounds per game
 
     with open(path) as file:
         games = file.read().splitlines()
@@ -27,7 +36,6 @@ def parse(path):
 def solve_part1(cubes):
     limit = np.array([12, 13, 14])
     valid = np.all(cubes.max(2) <= limit, 1)
-
     return np.sum(np.argwhere(valid) + 1)
 
 
