@@ -1,3 +1,4 @@
+import logging
 import sys
 from collections import deque
 from pathlib import Path
@@ -68,6 +69,13 @@ def march(board: tuple[str, ...], curr: tuple[int, int], news: tuple[int, int]) 
         int: the count of tiles.
     """
 
+    TURNS = {
+        "-": {N: [E, W], S: [E, W]},
+        "|": {E: [N, S], W: [N, S]},
+        "/": {N: [E], E: [N], W: [S], S: [W]},
+        "\\": {N: [W], E: [S], W: [N], S: [E]},
+    }
+
     tiles = set()  # a set of energized tiles
     moves = set()  # a set of moves (curr, news) already marched
     stack = deque([(curr, news)])  # a stack of moves to march
@@ -80,25 +88,16 @@ def march(board: tuple[str, ...], curr: tuple[int, int], news: tuple[int, int]) 
         if (curr, news) in moves:
             continue
 
-        match tile(board, curr):
-            case "-":
-                turns = {N: [E, W], S: [E, W], E: [news], W: [news]}
-                stack += [(curr, d) for d in turns[news]]
-            case "|":
-                turns = {E: [N, S], W: [N, S], N: [news], S: [news]}
-                stack += [(curr, d) for d in turns[news]]
-            case "/":
-                turn = {N: E, E: N, W: S, S: W}
-                stack += [(curr, turn[news])]
-            case "\\":
-                turn = {N: W, E: S, W: N, S: E}
-                stack += [(curr, turn[news])]
+        match t := tile(board, curr):
             case None:
                 # curr isn't within bounds of the board, so stop marching in this direction.
                 continue
-            case _:
+            case ".":
                 # We found a ".", so keep marching in this direction.
                 stack += [(curr, news)]
+            case _:
+                # Look up the list of next moves to march from TURNS.
+                stack += [(curr, d) for d in TURNS[t].get(news, [news])]
 
         tiles |= {curr}
         moves |= {(curr, news)}
@@ -133,14 +132,13 @@ def solve_part2(board: tuple[str, ...]) -> int:
 
 
 def main():
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
     path = Path(sys.argv[1])
     data = parse(path)
 
-    part1 = solve_part1(data)
-    print(f"> solve_part1 | {part1:>20} |")
-
-    part2 = solve_part2(data)
-    print(f"> solve_part2 | {part2:>20} |")
+    solve_part1(data)
+    solve_part2(data)
 
     return 0
 
