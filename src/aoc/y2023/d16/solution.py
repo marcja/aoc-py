@@ -11,6 +11,15 @@ S = (1, 0)  # South
 
 
 def parse(path: Path) -> tuple[str, ...]:
+    """Returns the board as a tuple of strings.
+
+    Args:
+        path (Path): the file path for the board data
+
+    Returns:
+        tuple[str, ...]: a tuple of strings
+    """
+
     with open(path) as file:
         return tuple(line.strip() for line in file)
 
@@ -88,7 +97,7 @@ def march(board: tuple[str, ...], curr: tuple[int, int], news: tuple[int, int]) 
                 # curr isn't within bounds of the board, so stop marching in this direction.
                 continue
             case _:
-                # We found a ".", so let's keep marching in this direction.
+                # We found a ".", so keep marching in this direction.
                 stack += [(curr, news)]
 
         tiles |= {curr}
