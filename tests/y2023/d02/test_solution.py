@@ -18,7 +18,7 @@ def ex01_data(ex01_path):
 
 def test_parse_ex01(ex01_path):
     data = parse(ex01_path)
-    assert isinstance(data, dict)
+    assert data.shape == (5, 3, 10)
 
 
 def test_solve_part1_ex01(ex01_data):
