@@ -7,29 +7,22 @@ from time import perf_counter
 import numpy as np
 
 
-def print_data(data):
-    print("----")
-    for line in data:
-        print("".join(line))
-
-
 def parse(path):
+    TR = {"O": -1, ".": 0, "#": 1}
+
     with open(path) as file:
-        return np.array([tuple(line.strip()) for line in file])
-
-
-def swap(hi, lo):
-    for i in range(len(hi)):
-        if lo[i] == "O" and hi[i] == ".":
-            hi[i] = "O"
-            lo[i] = "."
+        return np.array([[TR[cell] for cell in line.strip()] for line in file])
 
 
 def tilt(data):
-    for j in range(len(data), 1, -1):
-        for i in range(1, j):
-            swap(data[i - 1], data[i])
-
+    data = np.rot90(data)
+    data = np.row_stack(
+        [
+            np.concatenate([np.sort(s) for s in np.hsplit(r, np.where(r == 1)[0] + 1)])
+            for r in data
+        ]
+    )
+    data = np.rot90(data, -1)
     return data
 
 
@@ -56,10 +49,10 @@ def loop(data):
 
 
 def load(data):
-    test = np.count_nonzero(data == "O", 1)
-    rows = np.arange(test.shape[0], 0, -1)
+    rocks = np.count_nonzero(data == -1, 1)
+    score = np.arange(rocks.shape[0], 0, -1)
 
-    return np.sum(test * rows)
+    return np.sum(rocks * score)
 
 
 def solve_part1(data):
@@ -67,7 +60,7 @@ def solve_part1(data):
 
 
 def solve_part2(data, times=1000000000):
-    beg, end, recs = loop(data)  # type: ignore
+    beg, end, recs = loop(data)
     stop = beg + (times - beg) % (end - beg)
     stop = min(times, stop) - 1
 
