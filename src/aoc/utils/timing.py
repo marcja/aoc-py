@@ -13,7 +13,7 @@ def timed(func):
         t1 = perf_counter()
         td = t1 - t0
 
-        log = logging.getLogger("timing")
+        log = logging.getLogger(__name__)
         log.info(f"{func.__name__} | {timedelta(seconds=td)} | {res:>20} | ")
 
         return res
