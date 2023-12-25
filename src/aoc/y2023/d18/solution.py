@@ -22,7 +22,7 @@ class Operation:
 
     @classmethod
     def from_rgb(cls, oper):
-        oper_len = int(f"0x{oper.rgb[:5]}", base=16)
+        oper_len = int(oper.rgb[:5], base=16)
         oper_dir = None
         match oper.rgb[-1]:
             case "0":
