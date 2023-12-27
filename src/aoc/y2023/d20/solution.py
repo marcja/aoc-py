@@ -8,7 +8,15 @@ from functools import reduce
 from itertools import count
 from math import lcm
 from pathlib import Path
-from typing import Hashable, Iterable, override
+from typing import (
+    Hashable,
+    Iterable,
+    Mapping,
+    Sequence,
+    Set,
+    Tuple,
+    override,
+)
 
 from aoc.utils.reporting import report
 
@@ -33,10 +41,15 @@ class Task:
     pulse: Pulse
 
 
-def parse(path):
+ModuleDict = Mapping[str, ModuleType | Sequence[str] | str]
+ModulesDict = Mapping[str, ModuleDict]
+SourcesDict = Mapping[str, Set[str]]
+
+
+def parse(path: Path) -> Tuple[ModulesDict, SourcesDict]:
     with open(path) as file:
-        modules = {}
-        sources = defaultdict(set)
+        modules: ModulesDict = {}
+        sources: SourcesDict = defaultdict(set)
 
         for line in file:
             module, target = line.split(" -> ")
@@ -97,13 +110,13 @@ def hashiter(iterable: Iterable[Hashable]) -> int:
 
 
 class Module(ABC):
-    def __init__(self, module, system: "System") -> None:
+    def __init__(self, module: ModuleDict, system: "System"):
         self.module = module
         self.system = system
         self.pulse = Pulse.LO
 
     @staticmethod
-    def create(module: dict, system: "System") -> "Module":
+    def create(module: ModuleDict, system: "System") -> "Module":
         """Create a concrete subclass of Module based on `module`
 
         Args:
@@ -128,20 +141,20 @@ class Module(ABC):
             case _:
                 assert False
 
-    def process(self, task):
+    def process(self, task: Task) -> Iterable[Task]:
         return ()
 
 
 class BroadcasterModule(Module):
     @override
-    def process(self, task):
+    def process(self, task: Task) -> Iterable[Task]:
         # send pulses to targets
         return (Task(task.target, t, task.pulse) for t in self.module["targets"])
 
 
 class FlipFlopModule(Module):
     @override
-    def process(self, task):
+    def process(self, task: Task) -> Iterable[Task]:
         if task.pulse == Pulse.HI:
             return ()
 
@@ -156,14 +169,14 @@ class FlipFlopModule(Module):
 
 
 class ConjunctionModule(Module):
-    def __init__(self, module, system):
+    def __init__(self, module: ModuleDict, system: "System"):
         super().__init__(module, system)
 
         # the memory of most recent pulses sent to this conjunction from each source
         self.input = defaultdict(lambda: Pulse.LO)
 
     @override
-    def process(self, task):
+    def process(self, task: Task) -> Iterable[Task]:
         # update memory for this target/source with this pulse
         self.input[task.source] = task.pulse
 
@@ -180,7 +193,7 @@ class OutputModule(Module):
 
 
 class System:
-    def __init__(self, modules, sources):
+    def __init__(self, modules: ModulesDict, sources: SourcesDict):
         self.modules = {m["id"]: Module.create(m, self) for m in modules.values()}
         self.sources = sources
 
@@ -188,14 +201,14 @@ class System:
         self.queue = deque()
         self.state = {id: False for id in modules}
 
-    def _clear(self):
+    def _clear(self) -> None:
         self.count.clear()
         self.queue.clear()
 
-    def _queue_button(self):
+    def _queue_button(self) -> None:
         self.queue.appendleft(Task(ModuleType.BUTTON, ModuleType.BROADCASTER, Pulse.LO))
 
-    def _solve(self, loop: Iterable, targets: list) -> int:
+    def _solve(self, loop: Iterable, targets: Iterable[str]) -> int:
         """Return the cycle or reach (see `cycle` and `reach`)
 
         Args:
@@ -259,7 +272,7 @@ class System:
 
         return self._solve(range(1, repeat + 1), [])
 
-    def reach(self, targets: list[str]) -> int:
+    def reach(self, targets: Iterable[str]) -> int:
         """Return the count of button presses required to deliver a low pulse to 'rx'
 
         HACK: The list of target nodes to track (`targets`) is a bit of a hack. The
@@ -278,14 +291,14 @@ class System:
 
 
 @report
-def solve_part1(data) -> int:
+def solve_part1(data: Tuple[ModulesDict, SourcesDict]) -> int:
     modules, sources = data
     system = System(modules, sources)
     return system.cycle(1000)
 
 
 @report
-def solve_part2(data) -> int:
+def solve_part2(data: Tuple[ModulesDict, SourcesDict]) -> int:
     modules, sources = data
     system = System(modules, sources)
 
