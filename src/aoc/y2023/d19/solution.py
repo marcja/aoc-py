@@ -1,12 +1,11 @@
 import logging
-import operator
 import re
 import sys
-from abc import ABC
-from collections import deque
 from dataclasses import dataclass
+from functools import total_ordering
+from math import prod
 from pathlib import Path
-from typing import Callable, ClassVar
+from typing import ClassVar, Iterable
 
 from aoc.utils.reporting import report
 
@@ -16,9 +15,10 @@ class Part(dict):
         r"{x=(?P<x>\d+),m=(?P<m>\d+),a=(?P<a>\d+),s=(?P<s>\d+)}"
     )
 
-    def __init__(self, input):
+    @classmethod
+    def parse(cls, input: str):
         m = re.fullmatch(Part.RE, input)
-        self.update({k: int(m.group(k)) for k in "xmas"})
+        return cls({k: int(m.group(k)) for k in "xmas"})
 
     def rating(self):
         return sum(v for k, v in self.items() if k in "xmas")
@@ -26,82 +26,177 @@ class Part(dict):
 
 @dataclass
 class Parts(list):
-    def __init__(self, input):
-        self += [part for part in map(Part, input.splitlines())]
+    @classmethod
+    def parse(cls, input: str):
+        return cls([part for part in map(Part.parse, input.splitlines())])
+
+    def __init__(self, iterable: Iterable):
+        super().__init__(iterable)
 
 
-@dataclass
-class Action(ABC):
-    @staticmethod
-    def create(workflow):
-        match workflow:
-            case "A":
-                return AcceptAction()
-            case "R":
-                return RejectAction()
-            case str(name):
-                return AssignAction(name)
-            case _:
-                assert False
+@dataclass(frozen=True)
+@total_ordering
+class PartsBlock:
+    # the *inclusive* lower bound of block
+    lower: int = None
+    # the *inclusive* upper bound of block
+    upper: int = None
 
+    def __post_init__(self):
+        if self.lower and self.upper:
+            assert self.lower <= self.upper
 
-@dataclass
-class AcceptAction(Action):
-    pass
+        if self.lower is None:
+            assert self.upper is None
 
+    def __eq__(self, other):
+        if not isinstance(other, PartsBlock):
+            raise TypeError
 
-@dataclass
-class RejectAction(Action):
-    pass
+        return self.lower == other.lower and self.upper == other.upper
 
+    def __lt__(self, other):
+        # subset
+        if not isinstance(other, PartsBlock):
+            raise TypeError
 
-@dataclass
-class AssignAction(Action):
-    workflow: str
+        if self.isempty():
+            return True
+
+        return self.lower >= other.lower and self.upper <= other.upper
+
+    def __and__(self, other):
+        # union
+        if not isinstance(other, PartsBlock):
+            raise TypeError
+
+        if self.isempty():
+            return other
+
+        if other.isempty():
+            return self
+
+        if self.isdisjoint(other):
+            return PartsBlock()
+
+        lower = min(self.lower, other.lower)
+        upper = max(self.upper, other.upper)
+
+        return PartsBlock(lower, upper)
+
+    def __or__(self, other):
+        # intersection
+        if not isinstance(other, PartsBlock):
+            raise TypeError
+
+        if self.isempty() or other.isempty():
+            return PartsBlock()
+
+        lower = max(self.lower, other.lower)
+        upper = min(self.upper, other.upper)
+
+        if lower <= upper:
+            return PartsBlock(lower, upper)
+        else:
+            return PartsBlock()
+
+    def __sub__(self, other):
+        # difference
+        if not isinstance(other, PartsBlock):
+            raise TypeError
+
+        if other.isempty():
+            return self
+
+        if self <= other:
+            return PartsBlock()
+
+        if other.lower > self.lower:
+            return PartsBlock(self.lower, other.lower - 1)
+        else:
+            return PartsBlock(other.upper + 1, self.upper)
+
+    def __contains__(self, other):
+        if not isinstance(other, int):
+            raise TypeError
+
+        return self.lower <= other <= self.upper
+
+    def __len__(self):
+        return self.upper + 1 - self.lower
+
+    def isdisjoint(self, other):
+        return (self | other).isempty()
+
+    def isempty(self):
+        return self.lower is None and self.upper is None
 
 
 @dataclass
 class Condition:
     RE: ClassVar[re.Pattern] = re.compile(r"(?P<key>[xmas])(?P<cmp>[<>])(?P<val>\d+)")
+    BLOCK: ClassVar[PartsBlock] = PartsBlock(1, sys.maxsize)
 
-    cmp: Callable[[int, int], bool] = None
     key: str = None
-    val: int = None
+    block: PartsBlock = BLOCK
 
-    def __init__(self, input):
-        if input:
-            m = re.fullmatch(Condition.RE, input)
-            match m.group("cmp"):
-                case "<":
-                    self.cmp = operator.lt
-                case ">":
-                    self.cmp = operator.gt
-                case _:
-                    assert False
-            self.key = m.group("key")
-            self.val = int(m.group("val"))
+    @classmethod
+    def parse(cls, input: str):
+        if not input:
+            return Condition()
 
-    def check(self, part):
-        return self.cmp is None or self.cmp(part[self.key], self.val)
+        m = re.fullmatch(Condition.RE, input)
+        key = m.group("key")
+        match m.group("cmp"):
+            case "<":
+                block = PartsBlock(Condition.BLOCK.lower, int(m.group("val")) - 1)
+            case ">":
+                block = PartsBlock(int(m.group("val")) + 1, Condition.BLOCK.upper)
+            case _:
+                assert False
+
+        return cls(key, block)
+
+    def check(self, part: Part):
+        return self.key is None or part[self.key] in self.block
+
+    def combo(self, blocks: PartsBlock):
+        if self.key is None:
+            return None
+        else:
+            lhs = self.block
+            rhs = blocks[self.key]
+
+            return (
+                {self.key: rhs | lhs},
+                {self.key: rhs - lhs},
+            )
 
 
 @dataclass
 class Rule:
     RE: ClassVar[re.Pattern] = re.compile(r"((?P<condition>.+):)?(?P<key>\w+)")
 
-    action: Action
+    action: str
     condition: Condition
 
-    def __init__(self, input):
+    @classmethod
+    def parse(cls, input: str):
         m = re.fullmatch(Rule.RE, input)
-        self.action = Action.create(m.group("key"))
-        self.condition = Condition(m.group("condition"))
+        action = m.group("key")
+        condition = Condition.parse(m.group("condition"))
 
-    def check(self, part):
-        if self.condition and self.condition.check(part):
-            return self.action
-        else:
-            return None
+        return cls(action, condition)
+
+    def check(self, part: Part):
+        return self.action if self.condition.check(part) else None
+
+    def combo(self, blocks: PartsBlock):
+        match self.condition.combo(blocks):
+            case lhs, rhs:
+                return self.action, blocks | lhs, blocks | rhs
+            case _:
+                return self.action, blocks, PartsBlock()
 
 
 @dataclass
@@ -111,10 +206,13 @@ class Workflow:
     key: str
     rules: list[Rule]
 
-    def __init__(self, input):
+    @classmethod
+    def parse(cls, input: str):
         m = re.fullmatch(Workflow.RE, input)
-        self.key = m.group("key")
-        self.rules = list(Rule(r) for r in m.group("rules").split(","))
+        key = m.group("key")
+        rules = list(Rule.parse(r) for r in m.group("rules").split(","))
+
+        return cls(key, rules)
 
     def check(self, part: Part):
         for rule in self.rules:
@@ -123,34 +221,72 @@ class Workflow:
 
         assert False
 
+    def combo(self, blocks: PartsBlock):
+        result = []
+
+        for rule in self.rules:
+            key, lhs, blocks = rule.combo(blocks)
+            result.append((key, lhs))
+
+        return result
+
 
 @dataclass
 class System:
     workflows: dict[Workflow]
 
-    def __init__(self, input):
-        self.workflows = {w.key: w for w in map(Workflow, input.splitlines())}
+    @classmethod
+    def parse(cls, input: str):
+        workflows = {w.key: w for w in map(Workflow.parse, input.splitlines())}
+
+        return cls(workflows)
 
     def check(self, part: Part):
-        queue = deque()
-        queue.appendleft(self.workflows["in"])
+        stack = []
+        stack.append(self.workflows["in"])
 
-        while queue:
-            w = queue.pop()
-            match w.check(part):
-                case AcceptAction():
+        while stack:
+            workflow = stack.pop()
+            match workflow.check(part):
+                case "A":
                     return True
-                case RejectAction():
+                case "R":
                     return False
-                case AssignAction(a):
-                    queue.appendleft(self.workflows[a])
+                case key:
+                    stack.append(self.workflows[key])
+
+    def combo(self, key: str):
+        blocks = dict({c: PartsBlock(1, 4000) for c in "xmas"})
+        result = 0
+
+        stack = []
+        stack.append((key, blocks))
+
+        while stack:
+            action, blocks = stack.pop()
+
+            for key, blocks in self.workflows[action].combo(blocks):
+                combos = prod(len(block) for block in blocks.values())
+
+                # for visualization at https://sankeymatic.com/build/
+                # print(f"{action} [{combos}] {key}")
+
+                match key:
+                    case "A":
+                        result += combos
+                    case "R":
+                        continue
+                    case _:
+                        stack.append((key, blocks))
+
+        return result
 
 
 def parse(path):
     with open(path) as file:
-        s, p = file.read().split("\n\n")
+        system, parts = file.read().split("\n\n")
 
-        return System(s), Parts(p)
+        return System.parse(system), Parts.parse(parts)
 
 
 @report
@@ -162,9 +298,9 @@ def solve_part1(data) -> int:
 
 @report
 def solve_part2(data) -> int:
-    system, parts = data
+    system, _ = data
 
-    return ...
+    return system.combo("in")
 
 
 def main():
