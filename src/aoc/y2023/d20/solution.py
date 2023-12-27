@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 from functools import reduce
@@ -16,7 +16,7 @@ class Pulse(Enum):
 
 
 class ModuleType(StrEnum):
-    BROADCASTER = "b"
+    BROADCASTER = "broadcaster"
     CONJUNCTION = "&"
     FLIP_FLOP = "%"
     OUTPUT = "#"
@@ -39,7 +39,7 @@ def parse(path):
             targets = tuple(t.strip(",") for t in target.split())
 
             match source:
-                case str(key) if key[0] == ModuleType.BROADCASTER:
+                case str(key) if key == ModuleType.BROADCASTER:
                     modules[key] = {
                         "type": ModuleType.BROADCASTER,
                         "targets": targets,
@@ -60,7 +60,7 @@ def parse(path):
                 case _:
                     assert False
 
-            if source != "broadcaster":
+            if source != ModuleType.BROADCASTER:
                 for target in targets:
                     sources[target].add(source[1:])
 
@@ -75,83 +75,96 @@ def hash_state(iterable: Iterable):
     return reduce(lambda h, x: (h * 31) ^ hash(x), iterable, 0)
 
 
+class System:
+    def __init__(self, modules, sources):
+        self.modules = modules
+        self.sources = sources
+
+        self.cache = {}
+        self.count = Counter()
+        self.queue = deque()
+        self.state = {key: False for key in modules}
+        self.table = defaultdict(lambda: Pulse.LO)
+
+    def run(self, n):
+        self.count.clear()
+
+        for i in range(n):
+            cache_key = hash_state(self.state.items())
+            if cache_key not in self.cache:
+                self._process_button()
+
+                while self.queue:
+                    task = self.queue.pop()
+                    module = self.modules[task.target]
+
+                    # update count of pulses
+                    self.count.update([task.pulse])
+
+                    # process this task
+                    match module["type"]:
+                        case ModuleType.BROADCASTER:
+                            # sends incoming pulse to all target modules
+                            self._process_broadcast(task, module)
+
+                        case ModuleType.FLIP_FLOP:
+                            self._process_flip_flop(task, module)
+
+                        case ModuleType.CONJUNCTION:
+                            self._process_conjunction(task, module)
+
+                self.cache[cache_key] = self.count[Pulse.LO], self.count[Pulse.HI]
+            else:
+                self.count[Pulse.LO] *= n // len(self.cache)
+                self.count[Pulse.HI] *= n // len(self.cache)
+                break
+
+        return self.count[Pulse.LO] * self.count[Pulse.HI]
+
+    def _process_button(self):
+        self.queue.appendleft(Task("button", ModuleType.BROADCASTER, Pulse.LO))
+
+    def _process_broadcast(self, task, module):
+        # send pulses to targets
+        for sink in module["targets"]:
+            self.queue.appendleft(Task(task.target, sink, task.pulse))
+
+    def _process_flip_flop(self, task, module):
+        if task.pulse == Pulse.LO:
+            # toggle flip-flop state
+            self.state[task.target] = not self.state[task.target]
+
+            # if on, send a high pulse; if off, send a low pulse
+            pulse = Pulse.HI if self.state[task.target] else Pulse.LO
+
+            # send pulses to targets
+            for sink in module["targets"]:
+                self.queue.appendleft(Task(task.target, sink, pulse))
+
+    def _process_conjunction(self, task, module):
+        def key(target, source):
+            return ":".join((target, source))
+
+        # update memory for this target/source with this pulse
+        self.table[key(task.target, task.source)] = task.pulse
+
+        # if high pulses for all inputs, send low pulse; otherwise, send high pulse
+        all_hi = all(
+            self.table[key(task.target, source)] == Pulse.HI
+            for source in self.sources[task.target]
+        )
+        pulse = Pulse.LO if all_hi else Pulse.HI
+
+        # send pulses to targets
+        for sink in module["targets"]:
+            self.queue.appendleft(Task(task.target, sink, pulse))
+
+
 @report
 def solve_part1(data, n=1000) -> int:
     modules, sources = data
-    states = {key: False for key in modules}
-    srcmem = defaultdict(lambda: Pulse.LO)
-    cached = {}
-    result_lo = 0
-    result_hi = 0
-
-    queue = deque()
-
-    # press the broadcaster button 1000 times
-    for i in range(n):
-        hx = hash_state(states.items())
-        # print(f"-- {i} -- {hx}")
-        if hx in cached:
-            print("cached!")
-            lo, hi = cached[hx]
-            result_lo *= n // len(cached)
-            result_hi *= n // len(cached)
-            break
-
-        lo = 0
-        hi = 0
-
-        # push button
-        queue.appendleft(Task("button", "broadcaster", Pulse.LO))
-
-        while queue:
-            task = queue.pop()
-
-            source = task.source
-            target = task.target
-            pulse = task.pulse
-
-            # print(f"{source} -{pulse.value}-> {target}")
-
-            if pulse == Pulse.LO:
-                lo += 1
-            else:
-                hi += 1
-
-            module = modules[target]
-
-            # process this task
-            match module["type"]:
-                case ModuleType.BROADCASTER:
-                    # sends incoming pulse to all target modules
-                    for sink in module["targets"]:
-                        queue.appendleft(Task(target, sink, pulse))
-
-                case ModuleType.FLIP_FLOP:
-                    if pulse == Pulse.LO:
-                        # flip between on and off
-                        states[target] = not states[target]
-                        # if on, send a high pulse; if off, send a low pulse
-                        pulse = Pulse.HI if states[target] else Pulse.LO
-
-                        for sink in module["targets"]:
-                            queue.appendleft(Task(target, sink, pulse))
-
-                case ModuleType.CONJUNCTION:
-                    srcmem[f"{target}:{source}"] = pulse
-                    # if high pulses for all inputs, send low pulse; otherwise, send high pulse
-                    all_hi = all(
-                        srcmem[f"{target}:{s}"] == Pulse.HI for s in sources[target]
-                    )
-                    pulse = Pulse.LO if all_hi else Pulse.HI
-
-                    for sink in module["targets"]:
-                        queue.appendleft(Task(target, sink, pulse))
-
-        result_lo += lo
-        result_hi += hi
-        cached[hx] = (result_lo, result_hi)
-
-    return result_lo * result_hi
+    system = System(modules, sources)
+    return system.run(n)
 
 
 @report

@@ -47,7 +47,7 @@ def test_parse_ex02(example_path):
 
     pprint(("modules", modules))
     assert isinstance(modules, dict)
-    assert len(modules) == 5
+    assert len(modules) == 6
 
     pprint(("sources", sources))
     assert isinstance(sources, dict)
