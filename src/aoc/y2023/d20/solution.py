@@ -2,15 +2,17 @@ import logging
 import sys
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
-from enum import Enum, StrEnum
+from enum import StrEnum
 from functools import reduce
+from itertools import count
+from math import lcm
 from pathlib import Path
 from typing import Iterable
 
 from aoc.utils.reporting import report
 
 
-class Pulse(Enum):
+class Pulse(StrEnum):
     LO = "low"
     HI = "high"
 
@@ -35,23 +37,24 @@ def parse(path):
         sources = defaultdict(set)
 
         for line in file:
-            source, target = line.split(" -> ")
+            module, target = line.split(" -> ")
             targets = tuple(t.strip(",") for t in target.split())
 
-            match source:
-                case str(key) if key == ModuleType.BROADCASTER:
+            # map modules to their successor modules (ie the targets for pulses sent)
+            match module:
+                case str(key) if key.startswith(ModuleType.BROADCASTER):
                     modules[key] = {
                         "type": ModuleType.BROADCASTER,
                         "targets": targets,
                     }
 
-                case str(key) if key[0] == ModuleType.FLIP_FLOP:
+                case str(key) if key.startswith(ModuleType.FLIP_FLOP):
                     modules[key[1:]] = {
                         "type": ModuleType.FLIP_FLOP,
                         "targets": targets,
                     }
 
-                case str(key) if key[0] == ModuleType.CONJUNCTION:
+                case str(key) if key.startswith(ModuleType.CONJUNCTION):
                     modules[key[1:]] = {
                         "type": ModuleType.CONJUNCTION,
                         "targets": targets,
@@ -60,18 +63,19 @@ def parse(path):
                 case _:
                     assert False
 
-            if source != ModuleType.BROADCASTER:
+            # map modules to their predecessor modules (ie the sources for pulses received)
+            if module != ModuleType.BROADCASTER:
                 for target in targets:
-                    sources[target].add(source[1:])
+                    sources[target].add(module[1:])
 
-                    # for those pesky output-only modules
+                    # add any pesky output-only modules to modules
                     if target not in modules:
                         modules[target] = {"type": ModuleType.OUTPUT, "targets": ()}
 
         return modules, sources
 
 
-def hash_state(iterable: Iterable):
+def hashiter(iterable: Iterable):
     return reduce(lambda h, x: (h * 31) ^ hash(x), iterable, 0)
 
 
@@ -80,46 +84,74 @@ class System:
         self.modules = modules
         self.sources = sources
 
-        self.cache = {}
         self.count = Counter()
         self.queue = deque()
         self.state = {key: False for key in modules}
         self.table = defaultdict(lambda: Pulse.LO)
 
-    def run(self, n):
+    def cycle(self, repeat):
         self.count.clear()
+        cache = {}
 
-        for i in range(n):
-            cache_key = hash_state(self.state.items())
-            if cache_key not in self.cache:
-                self._process_button()
-
-                while self.queue:
-                    task = self.queue.pop()
-                    module = self.modules[task.target]
-
-                    # update count of pulses
-                    self.count.update([task.pulse])
-
-                    # process this task
-                    match module["type"]:
-                        case ModuleType.BROADCASTER:
-                            # sends incoming pulse to all target modules
-                            self._process_broadcast(task, module)
-
-                        case ModuleType.FLIP_FLOP:
-                            self._process_flip_flop(task, module)
-
-                        case ModuleType.CONJUNCTION:
-                            self._process_conjunction(task, module)
-
-                self.cache[cache_key] = self.count[Pulse.LO], self.count[Pulse.HI]
-            else:
-                self.count[Pulse.LO] *= n // len(self.cache)
-                self.count[Pulse.HI] *= n // len(self.cache)
+        for i in range(repeat):
+            cache_key = hashiter(self.state.items())
+            if cache_key in cache:
+                self.count[Pulse.LO] *= repeat // len(cache)
+                self.count[Pulse.HI] *= repeat // len(cache)
                 break
 
+            self._process_button()
+
+            while self.queue:
+                task = self.queue.pop()
+                module = self.modules[task.target]
+
+                # update count of pulses
+                self.count.update([task.pulse])
+
+                # process this task
+                match module["type"]:
+                    case ModuleType.BROADCASTER:
+                        # sends incoming pulse to all target modules
+                        self._process_broadcast(task, module)
+
+                    case ModuleType.FLIP_FLOP:
+                        self._process_flip_flop(task, module)
+
+                    case ModuleType.CONJUNCTION:
+                        self._process_conjunction(task, module, [], i)
+
+            cache[cache_key] = self.count[Pulse.LO], self.count[Pulse.HI]
+
         return self.count[Pulse.LO] * self.count[Pulse.HI]
+
+    def reach(self, target):
+        self.count.clear()
+
+        sources = list(self.sources[target])
+        targets = self.sources[sources[0]]
+
+        for i in count(1):
+            self._process_button()
+
+            while self.queue:
+                task = self.queue.pop()
+                module = self.modules[task.target]
+
+                # process this task
+                match module["type"]:
+                    case ModuleType.BROADCASTER:
+                        # sends incoming pulse to all target modules
+                        self._process_broadcast(task, module)
+
+                    case ModuleType.FLIP_FLOP:
+                        self._process_flip_flop(task, module)
+
+                    case ModuleType.CONJUNCTION:
+                        self._process_conjunction(task, module, targets, i)
+
+                if self.count.keys() == targets:
+                    return lcm(*self.count.values())
 
     def _process_button(self):
         self.queue.appendleft(Task("button", ModuleType.BROADCASTER, Pulse.LO))
@@ -141,7 +173,7 @@ class System:
             for sink in module["targets"]:
                 self.queue.appendleft(Task(task.target, sink, pulse))
 
-    def _process_conjunction(self, task, module):
+    def _process_conjunction(self, task, module, targets, i):
         def key(target, source):
             return ":".join((target, source))
 
@@ -159,17 +191,22 @@ class System:
         for sink in module["targets"]:
             self.queue.appendleft(Task(task.target, sink, pulse))
 
+        if task.target in targets and pulse == Pulse.HI:
+            self.count[task.target] = i
+
 
 @report
-def solve_part1(data, n=1000) -> int:
+def solve_part1(data, repeat=1000) -> int:
     modules, sources = data
     system = System(modules, sources)
-    return system.run(n)
+    return system.cycle(repeat)
 
 
 @report
-def solve_part2(modules) -> int:
-    return 0
+def solve_part2(data, target="rx") -> int:
+    modules, sources = data
+    system = System(modules, sources)
+    return system.reach(target)
 
 
 def main():

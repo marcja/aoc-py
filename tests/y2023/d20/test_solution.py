@@ -65,7 +65,6 @@ def test_solve_part1_ex02(example_data):
     assert solve_part1(example_data) == 11687500
 
 
-@pytest.mark.xfail
-@pytest.mark.example_path("ex01.txt")
+@pytest.mark.example_path("ex03.txt")
 def test_solve_part2_ex01(example_data):
-    assert solve_part2(example_data) == 167409079868000
+    assert solve_part2(example_data) == 2

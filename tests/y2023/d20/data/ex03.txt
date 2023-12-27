@@ -1,0 +1,7 @@
+broadcaster -> tc
+%tc -> cm, gc, sz, xf
+&cm -> zr
+&gc -> zr
+&sz -> zr
+&xf -> zr
+&zr -> rx
