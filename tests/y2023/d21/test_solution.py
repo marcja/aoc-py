@@ -9,7 +9,7 @@ from aoc.y2023.d21.solution import (
     Vec2d,
     parse,
     solve_part1,
-    solve_part2,
+    solve_part2,  # noqa: F401
 )
 
 DATA = Path(__file__).parent / "data"
@@ -167,17 +167,20 @@ def test_solve_part1_ex01_t06(example_data, steps, plots):
 @pytest.mark.parametrize(
     "steps, plots",
     [
-        # (6, 16),
-        # (10, 50),
-        # (50, 1594),
-        # (65, 2722),
-        # (100, 6536),
-        # (196, 25621),
-        (327, 71435),
+        (6, 16),
+        (10, 50),
+        (50, 1594),
+        (100, 6536),
         # (500, 167004),
         # (1000, 668697),
         # (5000, 16733044),
     ],
 )
 def test_solve_part2_ex01(example_data, steps, plots):
-    assert solve_part2(example_data, steps) == plots
+    # NOTE: We're only testing the infinite feature here, not the numerical estimation
+    # approach. Therefore, we're using solve_part1, not solve_part2. Performance is
+    # acceptable up to 100 steps, but it's yawningly slow above that (for example,
+    # 500 steps takes ~5m)
+
+    example_data.infinite = True
+    assert solve_part1(example_data, steps) == plots
