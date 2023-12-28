@@ -3,9 +3,11 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from pprint import pprint
 from typing import Iterable, Optional, Tuple
 
 from aoc.utils.reporting import report
+from numpy.polynomial import polynomial as npp
 from tqdm import trange
 
 
@@ -123,10 +125,27 @@ def solve_part2(garden, steps: int = 26501365) -> int:
     step = GardenStep()
     step.add(garden.start)
 
-    for i in range(steps):
+    samples = {}
+    for i in trange(steps + 1):
+        # if (i - 65) % 131 == 0:
+        if (i - garden.size.x // 2) % garden.size.x == 0:
+            samples[i] = len(step)
+            if len(samples) == 3:
+                break
+
         step = garden.next_step(step)
 
-    return len(step)
+    pprint(samples)
+    x, y = tuple(zip(*samples.items()))
+
+    # HACK: This actually doesn't work. Even though the above samples are correct, my
+    # polynomial fit and evaluation here is wrong. When I plug these same samples into
+    # Wolfram Alpha though, I get a quadratic formula that gets the right answer.
+
+    c = npp.polyfit(x, y, 2)
+    r = npp.polyval(steps, c)
+
+    return round(r)
 
 
 def main():
